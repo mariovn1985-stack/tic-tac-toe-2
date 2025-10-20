@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tic Tac Toe - 6ATHCSD (AI hard)</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--cell:#e6eef6}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,var(--bg),#061021);color:#e6eef6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .wrap{width:100%;max-width:520px;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));border-radius:16px;padding:18px;box-shadow:0 6px 30px rgba(2,6,23,0.7)}
+    h1{margin:0 0 10px;font-size:1.25rem;text-align:center}
+    .top{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:10px;color:var(--muted);cursor:pointer}
+    .btn.primary{background:var(--accent);color:#022;border:none}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px auto;width:320px;height:320px}
+    @media(max-width:420px){.board{width:260px;height:260px}}
+    .cell{background:var(--cell);display:flex;align-items:center;justify-content:center;font-size:3.2rem;border-radius:12px;cursor:pointer;user-select:none;font-weight:700;color:#0b1220;box-shadow:0 6px 18px rgba(2,6,23,0.25)}
+    .status{margin-top:8px;text-align:center;color:var(--muted)}
+    .controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+    footer{margin-top:12px;text-align:center;color:#93c5fd;font-size:0.85rem}
+    .small{font-size:0.85rem;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Tic Tac Toe — 6ATHCSD (AI: cực khó)</h1>
+
+    <div class="top">
+      <div class="small">Chọn ký tự:</div>
+      <button class="btn" id="chooseX">Bạn = X</button>
+      <button class="btn" id="chooseO">Bạn = O</button>
+      <button class="btn primary" id="restart">Chơi lại</button>
+    </div>
+
+    <div class="board" id="board" role="grid" aria-label="Tic Tac Toe board"></div>
+
+    <div class="status" id="status">Chọn X hoặc O để bắt đầu.</div>
+
+    <div class="controls">
+      <button class="btn" id="undo">Hoàn tác</button>
+      <button class="btn" id="hint">Gợi ý (1 nước)</button>
+    </div>
+
+    <footer>AI sử dụng thuật toán Minimax (tối ưu) — rất khó để thắng.</footer>
+  </div>
+
+<script>
+  // Game state
+  let board = Array(9).fill(null);
+  let human = null;
+  let ai = null;
+  let current = 'X';
+  let gameActive = false;
+  let history = [];
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const chooseX = document.getElementById('chooseX');
+  const chooseO = document.getElementById('chooseO');
+  const restartBtn = document.getElementById('restart');
+  const undoBtn = document.getElementById('undo');
+  const hintBtn = document.getElementById('hint');
+
+  function render(){
+    boardEl.innerHTML = '';
+    board.forEach((cell, idx) => {
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.textContent = cell || '';
+      div.dataset.index = idx;
+      div.onclick = () => handleClick(idx);
+      boardEl.appendChild(div);
+    });
+  }
+
+  function handleClick(i){
+    if(!gameActive) return;
+    if(board[i]) return;
+    if(current !== human) return; // not human's turn
+    makeMove(i, human);
+    if(!checkEnd()) {
+      setTimeout(() => {
+        aiPlay();
+        checkEnd();
+      }, 180);
+    }
+  }
+
+  function makeMove(i, player){
+    history.push(board.slice());
+    board[i] = player;
+    current = (player === 'X') ? 'O' : 'X';
+    render();
+  }
+
+  function aiPlay(){
+    const best = minimax(board, ai).index;
+    if(best !== undefined && best !== null){
+      makeMove(best, ai);
+    }
+  }
+
+  function checkWin(b){
+    const wins = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6]
+    ];
+    for(const [a,b1,c] of wins){
+      if(b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+    }
+    return null;
+  }
+
+  function emptyIndices(b){
+    return b.map((v,i) => v ? null : i).filter(x => x !== null);
+  }
+
+  function checkEnd(){
+    const winner = checkWin(board);
+    if(winner){
+      gameActive = false;
+      statusEl.textContent = (winner === human) ? 'Bạn thắng! (hiếm)' : (winner === ai) ? 'Máy thắng.' : 'Kết thúc.';
+      return true;
+    } else if(!board.includes(null)){
+      gameActive = false;
+      statusEl.textContent = 'Hòa!';
+      return true;
+    } else {
+      statusEl.textContent = (current === human) ? 'Lượt của bạn' : 'Máy đang suy nghĩ...';
+      return false;
+    }
+  }
+
+  // Minimax algorithm (unbeatable)
+  function minimax(newBoard, player){
+    const avail = emptyIndices(newBoard);
+    const winner = checkWin(newBoard);
+    if(winner === human) return {score: -10};
+    if(winner === ai) return {score: 10};
+    if(avail.length === 0) return {score: 0};
+
+    const moves = [];
+
+    for(let i=0;i<avail.length;i++){
+      const idx = avail[i];
+      const move = {};
+      move.index = idx;
+      newBoard[idx] = player;
+
+      if(player === ai){
+        const result = minimax(newBoard, human);
+        move.score = result.score;
+      } else {
+        const result = minimax(newBoard, ai);
+        move.score = result.score;
+      }
+
+      newBoard[idx] = null;
+      moves.push(move);
+    }
+
+    // choose best move
+    let bestMove;
+    if(player === ai){
+      let bestScore = -Infinity;
+      for(const m of moves){
+        if(m.score > bestScore){
+          bestScore = m.score;
+          bestMove = m;
+        }
+      }
+    } else {
+      let bestScore = Infinity;
+      for(const m of moves){
+        if(m.score < bestScore){
+          bestScore = m.score;
+          bestMove = m;
+        }
+      }
+    }
+    return bestMove;
+  }
+
+  // UI controls
+  chooseX.onclick = () => startAs('X');
+  chooseO.onclick = () => startAs('O');
+  restartBtn.onclick = resetGame;
+  undoBtn.onclick = undo;
+  hintBtn.onclick = hint;
+
+  function startAs(ch){
+    human = ch;
+    ai = (ch === 'X') ? 'O' : 'X';
+    board = Array(9).fill(null);
+    history = [];
+    current = 'X';
+    gameActive = true;
+    statusEl.textContent = (current === human) ? 'Lượt của bạn' : 'Máy đang suy nghĩ...';
+    render();
+    if(current === ai){
+      setTimeout(() => { aiPlay(); checkEnd(); }, 300);
+    }
+  }
+
+  function resetGame(){
+    board = Array(9).fill(null);
+    history = [];
+    current = 'X';
+    gameActive = !!human;
+    statusEl.textContent = human ? ((current===human)?'Lượt của bạn':'Máy đang suy nghĩ...') : 'Chọn X hoặc O để bắt đầu.';
+    render();
+    if(gameActive && current === ai){
+      setTimeout(()=>{ aiPlay(); checkEnd(); }, 300);
+    }
+  }
+
+  function undo(){
+    if(history.length === 0) return;
+    board = history.pop();
+    current = current === 'X' ? 'O' : 'X'; // revert turn
+    gameActive = true;
+    render();
+    statusEl.textContent = (current === human) ? 'Lượt của bạn' : 'Máy đang suy nghĩ...';
+  }
+
+  function hint(){
+    if(!gameActive || current !== human) return;
+    const suggestion = minimax(board, human).index;
+    if(suggestion !== undefined && suggestion !== null){
+      // flash the cell
+      const cell = boardEl.querySelector('[data-index="'+suggestion+'"]');
+      if(cell){
+        const orig = cell.style.boxShadow;
+        cell.style.transform = 'scale(1.03)';
+        setTimeout(()=>{ cell.style.transform = ''; }, 450);
+      }
+    }
+  }
+
+  // initialize render
+  render();
+</script>
+</body>
+</html>
